@@ -8,6 +8,7 @@ import requests
 import subprocess
 import time
 from kasa import Discover
+from kasa import SmartPlug
 
 from config import *
 
@@ -122,16 +123,17 @@ async def enforce_normal_policy(plug, percent):
         await ensure_plug_off(plug)
 
 async def get_plug():
-#    try:
-#        plug = SmartPlug(PLUG_IP)
-#        await plug.update()
-#        logging.info("Using plug via cached IP %s", PLUG_IP)
-#        return plug
-#    except Exception:
-#        pass
     plug = await find_plug_by_mac(PLUG_MAC)
     if not plug:
-        raise RuntimeError("Smart plug not found")
+        logging.warning("Failed to find smart plug by MAC address %s", PLUG_MAC)
+        try:
+            plug = SmartPlug(PLUG_IP)
+            await plug.update()
+            logging.info("Using plug via cached IP %s", PLUG_IP)
+            return plug
+        except Exception:
+            logging.warning("Failed to initialize plug via cached IP %s", PLUG_IP)
+            raise RuntimeError("Smart plug not found")
     await plug.update()
     logging.info("Using plug via MAC discovery (%s)", plug.host)
     return plug

@@ -1,3 +1,4 @@
+PLUG_IP = "255.255.255.255"
 PLUG_MAC = "AA:BB:CC:DD:EE:FF"
 
 PUSHOVER_USER_KEY = "your_user_key_here"
