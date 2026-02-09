@@ -1,0 +1,7 @@
+# secrets / local config
+config.py
+
+# runtime artifacts
+*.log
+*.flag
+__pycache__/
