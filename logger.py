@@ -2,7 +2,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from config import LOG_FILE
 
-def setup_logging():
+def setup_logging() -> None:
     handler = RotatingFileHandler(
         LOG_FILE,
         maxBytes=25 * 1024,   # 25 KB
@@ -12,7 +12,7 @@ def setup_logging():
         "%(asctime)s [%(levelname)s] %(message)s"
     )
     handler.setFormatter(formatter)
-    logging.basicConfig(
-        level=logging.INFO,
-        handlers=[handler],
-    )
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.handlers.clear()
+    root.addHandler(handler)

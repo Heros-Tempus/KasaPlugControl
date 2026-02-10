@@ -4,7 +4,7 @@ import requests
 from config import PUSHOVER_APP_TOKEN, PUSHOVER_USER_KEY
 
 logger = logging.getLogger(__name__)
-def notify_emergency(title: str, message: str):
+def notify_emergency(title: str, message: str) -> None:
     try:
         requests.post(
             "https://api.pushover.net/1/messages.json",
@@ -20,7 +20,7 @@ def notify_emergency(title: str, message: str):
     except Exception as e:
         logger.error("Failed to send Pushover alert: %s", e)
 
-def hibernate_system():
+def hibernate_system() -> None:
     logger.critical("Battery emergency detected — hibernating system immediately")
     subprocess.run(
         ["shutdown", "/h", "/f"],

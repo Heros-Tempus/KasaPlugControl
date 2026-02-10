@@ -2,19 +2,20 @@ import os
 import logging
 from time import ctime
 import asyncio
+
+from kasa import SmartPlug
 from config import CALIBRATION_STATE_FILE, CALIBRATION_CHARGE_TO, CALIBRATION_POLL_SECONDS, CALIBRATION_DISCHARGE_TO
-from plug_functions import ensure_plug_off, ensure_plug_on
-from normal_operation import get_battery_status
+from plug_functions import ensure_plug_off, ensure_plug_on, get_battery_status
 
 logger = logging.getLogger(__name__)
-def calibration_already_done():
+def calibration_already_done() -> bool:
     return os.path.exists(CALIBRATION_STATE_FILE)
         
-def mark_calibration_done():
+def mark_calibration_done() -> None:
     with open(CALIBRATION_STATE_FILE, "w") as f:
         f.write(ctime())
 
-async def run_calibration_cycles(plug, cycles: int):
+async def run_calibration_cycles(plug: SmartPlug, cycles: int) -> None:
     logger.warning(
         "Starting battery calibration: %d cycle(s)",
         cycles,
@@ -24,7 +25,7 @@ async def run_calibration_cycles(plug, cycles: int):
                         cycle, cycles, CALIBRATION_CHARGE_TO)
         # -------- CHARGE PHASE --------
         while True:
-            percent, power_plugged = get_battery_status()
+            percent, _ = get_battery_status()
             if percent is None:
                 await asyncio.sleep(CALIBRATION_POLL_SECONDS)
                 continue
@@ -40,7 +41,7 @@ async def run_calibration_cycles(plug, cycles: int):
                         cycle, cycles, CALIBRATION_DISCHARGE_TO)
         # -------- DISCHARGE PHASE --------
         while True:
-            percent, power_plugged = get_battery_status()
+            percent, _ = get_battery_status()
             if percent is None:
                 await asyncio.sleep(CALIBRATION_POLL_SECONDS)
                 continue

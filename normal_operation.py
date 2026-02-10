@@ -1,19 +1,16 @@
+import asyncio
 from time import time
 import logging
-import psutil
+from typing import Optional
+from kasa import SmartPlug
 import wmi
 from config import NORMAL_CHARGE_OFF_ABOVE, NORMAL_CHARGE_ON_BELOW, VIGILANCE_GRACE_SECONDS, VIGILANCE_MAX_PERCENT, VIGILANCE_MIN_PERCENT
 from emergency import hibernate_system
-from plug_functions import ensure_plug_off, ensure_plug_on
+from plug_functions import ensure_plug_off, ensure_plug_on, get_battery_status
 
 logger = logging.getLogger(__name__)
-def get_battery_status():
-    battery = psutil.sensors_battery()
-    if battery is None:
-        return None, None
-    return battery.percent, battery.power_plugged
 
-async def enforce_normal_policy(plug, percent):
+async def enforce_normal_policy(plug: SmartPlug, percent: Optional[float]) -> None:
     if percent is None:
         return
     if percent <= NORMAL_CHARGE_ON_BELOW:
@@ -23,7 +20,7 @@ async def enforce_normal_policy(plug, percent):
         logger.info(f"Percent is {percent}")
         await ensure_plug_off(plug)
 
-async def normal_operation(plug):
+async def normal_operation(plug: SmartPlug) -> None:
     """
     Normal operation:
       - Event-driven (WMI) with periodic timeout fallback
@@ -50,8 +47,9 @@ async def normal_operation(plug):
     while True:
         # Wait for battery change or timeout
         try:
-            watcher(timeout_ms=5000)  # 5 seconds
+            watcher(timeout_ms=4000)
         except Exception:
+            await asyncio.sleep(1)
             c = wmi.WMI()
             watcher = c.watch_for(
                 notification_type="Modification",
@@ -92,7 +90,7 @@ async def normal_operation(plug):
             and percent < last_percent
             and not plug_is_on
         ):
-            elapsed = time() - (vigilance_started_at if vigilance_started_at else 0)
+            elapsed = time() - (vigilance_started_at if vigilance_started_at else time())
             if elapsed >= VIGILANCE_GRACE_SECONDS:
                 logger.critical(
                     "Battery dropped from %d%% to %d%% after %.1fs without charging — EMERGENCY",
@@ -124,7 +122,6 @@ async def normal_operation(plug):
                 percent,
             )
             await ensure_plug_on(plug)
-            plug_is_on = True
         await enforce_normal_policy(plug, percent)
         last_percent = percent
         last_power_state = power_plugged

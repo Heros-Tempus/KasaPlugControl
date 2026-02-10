@@ -1,11 +1,10 @@
 import asyncio
 import logging
 from normal_operation import normal_operation
-from plug_functions import get_plug
+from plug_functions import get_plug, get_battery_status
 from config import DO_CALIBRATION_CYCLES, CALIBRATION_CYCLES
 from calibration import calibration_already_done, run_calibration_cycles, mark_calibration_done
 from logger import setup_logging
-from normal_operation import get_battery_status
 
 logger = logging.getLogger(__name__)
 
@@ -26,4 +25,8 @@ async def main():
     await normal_operation(plug)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    exepct Exception:
+        logging.exception("Fatal unhandled exception")
+        raise
