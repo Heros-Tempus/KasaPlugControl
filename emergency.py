@@ -1,4 +1,6 @@
-
+from time import time
+from normal_operation import get_battery_status
+import asyncio
 import logging
 import subprocess
 import requests
@@ -27,3 +29,19 @@ def hibernate_system():
         ["shutdown", "/h", "/f"],
         check=False
     )
+
+async def verify_charging_after_plug_on(timeout=5):
+    start = time()
+    while time() - start < timeout:
+        _, power_plugged = get_battery_status()
+        if power_plugged:
+            logging.info("Charging confirmed after plug ON")
+            return True
+        await asyncio.sleep(0.5)
+    logging.critical("Plug ON but laptop did NOT start charging within %ds", timeout)
+    notify_emergency(
+        "Charging Failure",
+        "Smart plug turned ON but laptop did not start charging within 5 seconds. "
+        "Check cable, adapter, or outlet immediately.",
+    )
+    return False

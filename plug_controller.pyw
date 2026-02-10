@@ -7,9 +7,10 @@ from calibration import calibration_already_done, run_calibration_cycles, mark_c
 from logger import setup_logging
 from normal_operation import get_battery_status
 
+logger = logging.getLogger(__name__)
+
 async def main():
     setup_logging()
-    logger = logging.getLogger(__name__)
     logger.info("Battery charge controller starting (normal mode)")
     plug = await get_plug()        
     percent, power_plugged = get_battery_status()

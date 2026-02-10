@@ -3,7 +3,8 @@ import logging
 from time import ctime
 import asyncio
 from config import CALIBRATION_STATE_FILE, CALIBRATION_CHARGE_TO, CALIBRATION_POLL_SECONDS, CALIBRATION_DISCHARGE_TO
-from plug_functions import get_battery_status, ensure_plug_off, ensure_plug_on
+from plug_functions import ensure_plug_off, ensure_plug_on
+from normal_operation import get_battery_status
 
 logger = logging.getLogger(__name__)
 def calibration_already_done():

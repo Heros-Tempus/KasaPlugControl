@@ -1,10 +1,8 @@
-import asyncio
 import logging
 from time import time
-from emergency import notify_emergency
+from emergency import verify_charging_after_plug_on
 from kasa import Discover, SmartPlug
 from config import PLUG_IP, PLUG_MAC
-from normal_operation import get_battery_status
 
 logger = logging.getLogger(__name__)
 
@@ -13,33 +11,17 @@ async def ensure_plug_on(plug):
     if not plug.is_on:
         logger.info("Turning smart plug ON")
         await plug.turn_on()
+        charging_ok = await verify_charging_after_plug_on(plug)
+        if not charging_ok:
+            # Optional escalation
+            # hibernate_system()
+            pass
 
 async def ensure_plug_off(plug):
     await plug.update()
     if plug.is_on:
         logger.info("Turning smart plug OFF")
         await plug.turn_off()
-        charging_ok = await verify_charging_after_plug_on(plug)
-        if not charging_ok:
-            # Optional escalation
-            # hibernate_system()
-            pass
-        
-async def verify_charging_after_plug_on(plug, timeout=5):
-    start = time()
-    while time() - start < timeout:
-        percent, power_plugged = get_battery_status()
-        if power_plugged:
-            logging.info("Charging confirmed after plug ON")
-            return True
-        await asyncio.sleep(0.5)
-    logging.critical("Plug ON but laptop did NOT start charging within %ds", timeout)
-    notify_emergency(
-        "Charging Failure",
-        "Smart plug turned ON but laptop did not start charging within 5 seconds. "
-        "Check cable, adapter, or outlet immediately.",
-    )
-    return False
 
 async def get_plug():
     plug = await find_plug_by_mac(PLUG_MAC)
