@@ -27,6 +27,6 @@ async def main():
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    exepct Exception:
+    except Exception:
         logging.exception("Fatal unhandled exception")
         raise
