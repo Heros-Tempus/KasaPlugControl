@@ -4,8 +4,8 @@ import logging
 from typing import Optional
 from kasa import SmartPlug
 import wmi
-from config import NORMAL_CHARGE_OFF_ABOVE, NORMAL_CHARGE_ON_BELOW, VIGILANCE_GRACE_SECONDS, VIGILANCE_MAX_PERCENT, VIGILANCE_MIN_PERCENT
-from emergency import hibernate_system
+from config import CHARGE_FAILURE_DELTA, NORMAL_CHARGE_OFF_ABOVE, NORMAL_CHARGE_ON_BELOW, VIGILANCE_GRACE_SECONDS, VIGILANCE_MAX_PERCENT, VIGILANCE_MIN_PERCENT
+from emergency import hibernate_system, notify_emergency
 from plug_functions import ensure_plug_off, ensure_plug_on, get_battery_status
 
 logger = logging.getLogger(__name__)
@@ -123,5 +123,24 @@ async def normal_operation(plug: SmartPlug) -> None:
             )
             await ensure_plug_on(plug)
         await enforce_normal_policy(plug, percent)
+
+    # ---- Charging expectation failure detection ----
+        expected_min = NORMAL_CHARGE_ON_BELOW - CHARGE_FAILURE_DELTA
+
+        if (percent <= expected_min and plug_is_on and not power_plugged):
+            logger.critical(
+                "Charging failure detected: battery at %d%% "
+                "(threshold %d%%), plug ON but not charging",
+                percent,
+                NORMAL_CHARGE_ON_BELOW,
+            )
+
+            notify_emergency(
+            "Charging Failure Detected",
+            f"Battery dropped to {percent}% "
+            f"(below {expected_min}%) while plug is ON but not charging.\n"
+            "Check charger immediately."
+        )
+
         last_percent = percent
         last_power_state = power_plugged
