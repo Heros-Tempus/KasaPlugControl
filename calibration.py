@@ -4,7 +4,7 @@ from time import ctime
 import asyncio
 
 from kasa import SmartPlug
-from config import CALIBRATION_STATE_FILE, CALIBRATION_CHARGE_TO, CALIBRATION_POLL_SECONDS, CALIBRATION_DISCHARGE_TO
+from config import CALIBRATION_HOLD_FOR, CALIBRATION_STATE_FILE, CALIBRATION_CHARGE_TO, CALIBRATION_POLL_SECONDS, CALIBRATION_DISCHARGE_TO
 from plug_functions import ensure_plug_off, ensure_plug_on, get_battery_status
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ async def run_calibration_cycles(plug: SmartPlug, cycles: int) -> None:
             await ensure_plug_on(plug)
             await asyncio.sleep(CALIBRATION_POLL_SECONDS)
         # rest at full
-        await asyncio.sleep(60 * 60)
+        await asyncio.sleep(CALIBRATION_HOLD_FOR)
         logger.warning("Calibration cycle %d/%d — discharging to %d%%",
                         cycle, cycles, CALIBRATION_DISCHARGE_TO)
         # -------- DISCHARGE PHASE --------
