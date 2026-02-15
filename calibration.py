@@ -89,7 +89,7 @@ async def run_calibration_cycles(plug: SmartPlug, cycles: int) -> None:
             await ensure_plug_off(plug)
             await asyncio.sleep(CALIBRATION_POLL_SECONDS)
 
-    for cycle in range(1, cycles):
+    for cycle in range(1, cycles + 1):
         logger.warning("Calibration cycle %d/%d", cycle, cycles)
 
         await charge_to_target()
