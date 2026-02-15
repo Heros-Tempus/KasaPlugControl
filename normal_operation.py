@@ -117,7 +117,7 @@ async def normal_operation(plug: SmartPlug) -> None:
         # Safety: sudden drop >10%
         if last_percent is not None and (last_percent - percent) > 10:
             logger.error(
-                "Refund the Purchase: battery dropped from %d%% to %d%%",
+                "Significant battery drop: %d%% to %d%%",
                 last_percent,
                 percent,
             )
