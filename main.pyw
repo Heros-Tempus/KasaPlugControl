@@ -20,7 +20,6 @@ async def main():
     )
     if DO_CALIBRATION_CYCLES and not calibration_already_done():
         await run_calibration_cycles(plug, CALIBRATION_CYCLES)
-        mark_calibration_done()
     logger.info("Entering normal operation mode")
     await normal_operation(plug)
 
