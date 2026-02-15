@@ -67,7 +67,7 @@ async def normal_operation(plug: SmartPlug) -> None:
             continue
         plug_is_on = plug.is_on
         # Enter vigilance
-        if VIGILANCE_MIN_PERCENT <= percent < VIGILANCE_MAX_PERCENT and not vigilant:
+        if VIGILANCE_MIN_PERCENT < percent < VIGILANCE_MAX_PERCENT and not vigilant:
             vigilant = True
             vigilance_started_at = time()
             logger.warning(
