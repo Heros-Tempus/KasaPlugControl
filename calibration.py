@@ -89,20 +89,17 @@ async def run_calibration_cycles(plug: SmartPlug, cycles: int) -> None:
             await ensure_plug_off(plug)
             await asyncio.sleep(CALIBRATION_POLL_SECONDS)
 
+    logger.warning("Calibration cycle start")
+    await charge_to_target()
+    await asyncio.sleep(CALIBRATION_HOLD_FOR)
     for cycle in range(1, cycles + 1):
-        logger.warning("Calibration cycle %d/%d", cycle, cycles)
 
-        await charge_to_target()
-        await asyncio.sleep(CALIBRATION_HOLD_FOR)
         await discharge_to_target()
         await asyncio.sleep(60)
-
-    else:
-        # Final cycle ends fully charged
-        logger.warning("Calibration final cycle — ending at full charge")
-
+        
         await charge_to_target()
         await asyncio.sleep(CALIBRATION_HOLD_FOR)
+        logger.warning("Calibration cycle %d/%d complete", cycle, cycles)
 
     if CALIBRATION_PUSH_ON_COMPLETE:
         notify_emergency(
