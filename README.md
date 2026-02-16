@@ -3,21 +3,20 @@
 A small Windows utility to control a Kasa smart plug for safe laptop battery charging.
 
 Features
-- Normal operation mode: event-driven (WMI) battery monitoring with periodic fallback.
+- Normal operation mode: battery monitoring via periodic polling.
 - Vigilance mode when battery is in a risky window; can trigger hibernation on emergency.
 - Optional multi-cycle calibration routine to exercise full charge/discharge cycles.
 - Pushover notifications for critical alerts.
 
 Prerequisites
 - Python 3.8+
-- Windows (uses WMI for battery events)
 - Kasa-compatible smart plug reachable on the LAN (IP or MAC)
 
 Python dependencies
 Run:
 
 ```bash
-pip install kasa psutil wmi requests
+pip install kasa psutil requests
 ```
 
 Configuration
