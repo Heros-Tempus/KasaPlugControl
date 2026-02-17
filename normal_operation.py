@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 from kasa import SmartPlug
 from config import CHARGE_FAILURE_DELTA, NORMAL_CHARGE_OFF_ABOVE, NORMAL_CHARGE_ON_BELOW, NORMAL_POLL_FREQUENCY, VIGILANCE_GRACE_SECONDS, VIGILANCE_MAX_PERCENT, VIGILANCE_MIN_PERCENT
+from control import ControlState
 from emergency import hibernate_system, notify_emergency
 from plug_functions import ensure_plug_off, ensure_plug_on, get_battery_status
 
@@ -19,14 +20,7 @@ async def enforce_normal_policy(plug: SmartPlug, percent: Optional[float]) -> No
         logger.info(f"Percent is {percent}")
         await ensure_plug_off(plug)
 
-async def normal_operation(plug: SmartPlug) -> None:
-    """
-    Normal operation:
-      - Event-driven (WMI) with periodic timeout fallback
-      - Logs any change > 1%
-      - If a drop > 10% is detected between checks, immediately turns plug ON
-      - Respects manual overrides (user-forced charge or discharge)
-    """
+async def normal_operation(plug: SmartPlug, shutdown_event: asyncio.Event) -> None:
     logger.info("Starting normal operation")
     last_percent, last_power_state = get_battery_status()
     await enforce_normal_policy(plug, last_percent)
@@ -38,7 +32,7 @@ async def normal_operation(plug: SmartPlug) -> None:
             last_percent,
             last_power_state,
         )
-    while True:
+    while not shutdown_event.is_set():
         await asyncio.sleep(NORMAL_POLL_FREQUENCY)
         percent, power_plugged = get_battery_status()
         if percent is None:

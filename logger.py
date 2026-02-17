@@ -5,7 +5,7 @@ from config import LOG_FILE
 def setup_logging() -> None:
     handler = RotatingFileHandler(
         LOG_FILE,
-        maxBytes=25 * 1024,   # 25 KB
+        maxBytes=25 * 1024,
         backupCount=1
     )
     formatter = logging.Formatter(
