@@ -14,23 +14,38 @@ def create_icon(color):
     return image
 
 
+def format_remaining(seconds):
+    if seconds is None:
+        return ""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    return f" ({hours}h {minutes}m remaining)"
+
+
 def run_tray(shutdown_event, control):
 
-    def update_icon(icon):
-        mode = asyncio.run(control.get_mode())
-
+    def update_visuals(icon):
+        mode, remaining = asyncio.run(control.get_mode())
+        color, text = "", ""
         if mode == Mode.NORMAL:
-            icon.icon = create_icon("green")
+            color = "green"
+            text = "Normal Automation"
         elif mode == Mode.PAUSED:
-            icon.icon = create_icon("yellow")
+            color = "yellow"
+            text = "Paused"
         elif mode == Mode.FORCE_ON:
-            icon.icon = create_icon("blue")
+            color = "blue"
+            text = "Force ON"
         elif mode == Mode.FORCE_OFF:
-            icon.icon = create_icon("red")
+            color = "red"
+            text = "Force OFF"
+
+        icon.icon = create_icon(color)
+        icon.title = "Battery Controller\n" + text + format_remaining(remaining)
 
     def set_mode(mode, duration=None):
         asyncio.run(control.set_mode(mode, duration))
-        update_icon(icon)
+        update_visuals(icon)
 
     def force_on(icon, item):
         set_mode(Mode.FORCE_ON)
@@ -40,9 +55,6 @@ def run_tray(shutdown_event, control):
 
     def force_off(icon, item):
         set_mode(Mode.FORCE_OFF)
-
-    def force_off_2h(icon, item):
-        set_mode(Mode.FORCE_OFF, 7200)
 
     def pause(icon, item):
         set_mode(Mode.PAUSED)
@@ -60,12 +72,11 @@ def run_tray(shutdown_event, control):
     icon = pystray.Icon(
         "BatteryController",
         create_icon("green"),
-        "Battery Charge Controller",
+        "Battery Controller",
         menu=pystray.Menu(
             item("Force ON", force_on),
             item("Force ON (2 hours)", force_on_2h),
             item("Force OFF", force_off),
-            item("Force OFF (2 hours)", force_off_2h),
             pystray.Menu.SEPARATOR,
             item("Pause Automation", pause),
             item("Pause (2 hours)", pause_2h),
@@ -75,4 +86,5 @@ def run_tray(shutdown_event, control):
         ),
     )
 
+    update_visuals(icon)
     icon.run()

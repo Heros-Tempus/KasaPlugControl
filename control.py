@@ -25,7 +25,7 @@ class ControlState:
             else:
                 self.until = None
 
-    async def get_mode(self) -> Mode:
+    async def get_mode(self):
         async with self._lock:
             # Auto-expire timed overrides
             if self.until is not None:
@@ -33,4 +33,10 @@ class ControlState:
                 if loop.time() >= self.until:
                     self.mode = Mode.NORMAL
                     self.until = None
-            return self.mode
+                    
+            remaining = None
+            if self.until is not None:
+                loop = asyncio.get_running_loop()
+                remaining = max(0, int(self.until - loop.time()))
+
+            return self.mode, remaining
