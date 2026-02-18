@@ -1,33 +1,36 @@
 import asyncio
+from enum import Enum, auto
 from typing import Optional
+
+
+class Mode(Enum):
+    NORMAL = auto()
+    PAUSED = auto()
+    FORCE_ON = auto()
+    FORCE_OFF = auto()
+
 
 class ControlState:
     def __init__(self):
-        self.automation_enabled = True
-        self.override_until: Optional[float] = None
+        self.mode = Mode.NORMAL
+        self.until: Optional[float] = None
         self._lock = asyncio.Lock()
 
-    async def pause(self, seconds: Optional[int] = None):
+    async def set_mode(self, mode: Mode, duration_seconds: Optional[int] = None):
         async with self._lock:
-            self.automation_enabled = False
-            if seconds:
+            self.mode = mode
+            if duration_seconds:
                 loop = asyncio.get_running_loop()
-                self.override_until = loop.time() + seconds
+                self.until = loop.time() + duration_seconds
+            else:
+                self.until = None
 
-    async def resume(self):
+    async def get_mode(self) -> Mode:
         async with self._lock:
-            self.automation_enabled = True
-            self.override_until = None
-
-    async def should_run(self) -> bool:
-        async with self._lock:
-            if not self.automation_enabled:
-                if self.override_until is None:
-                    return False
+            # Auto-expire timed overrides
+            if self.until is not None:
                 loop = asyncio.get_running_loop()
-                if loop.time() >= self.override_until:
-                    self.automation_enabled = True
-                    self.override_until = None
-                    return True
-                return False
-            return True
+                if loop.time() >= self.until:
+                    self.mode = Mode.NORMAL
+                    self.until = None
+            return self.mode

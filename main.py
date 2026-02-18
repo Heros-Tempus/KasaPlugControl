@@ -2,7 +2,7 @@ import asyncio
 import logging
 import threading
 import sys
-
+from control import ControlState
 from normal_operation import normal_operation
 from plug_functions import get_plug, get_battery_status
 from config import DO_CALIBRATION_CYCLES, CALIBRATION_CYCLES
@@ -10,7 +10,7 @@ from calibration import calibration_already_done, run_calibration_cycles
 from logger import setup_logging
 
 logger = logging.getLogger(__name__)
-
+control = ControlState()
 
 async def async_main(shutdown_event: asyncio.Event):
     setup_logging()
@@ -30,7 +30,7 @@ async def async_main(shutdown_event: asyncio.Event):
 
     logger.info("Entering normal operation mode")
 
-    await normal_operation(plug, shutdown_event)
+    await normal_operation(plug, shutdown_event, control)
 
 
 def start_async_loop(shutdown_event: asyncio.Event):
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # Run tray in main thread (Windows safe)
     if sys.platform.startswith("win"):
         from windows_tray import run_tray
-        run_tray(shutdown_event)
+        run_tray(shutdown_event, control)
     else:
         # Non-Windows fallback: just block forever
         async_thread.join()
