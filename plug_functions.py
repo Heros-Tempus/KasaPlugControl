@@ -3,8 +3,8 @@ from time import time
 import psutil
 import asyncio
 from emergency import notify_emergency
-from kasa import Discover, SmartPlug
-from config import PLUG_IP, PLUG_MAC
+from kasa import Discover, SmartPlug, Credentials
+from config import KASA_PASSWORD, KASA_USERNAME, PLUG_IP, PLUG_MAC
 from typing import Optional, cast
 
 logger = logging.getLogger(__name__)
@@ -55,26 +55,29 @@ async def ensure_plug_off(plug: SmartPlug) -> None:
         await asyncio.sleep(0.5)  # Brief pause before checking status
 
 async def get_plug() -> SmartPlug:
+    credentials = Credentials(KASA_USERNAME, KASA_PASSWORD)
     plug = await find_plug_by_mac(PLUG_MAC)
     if not plug:
         logger.warning("Failed to find smart plug by MAC address %s", PLUG_MAC)
         try:
-            plug = SmartPlug(PLUG_IP)
+            device = await Discover.discover_single(PLUG_IP, credentials=credentials)
+            if not device:
+                raise RuntimeError("Failed to initialize plug via cached IP")
+            plug = cast(SmartPlug, device)
             await plug.update()
             logger.info("Using plug via cached IP %s", PLUG_IP)
             return plug
         except Exception:
             logger.warning("Failed to initialize plug via cached IP %s", PLUG_IP)
             raise RuntimeError("Smart plug not found")
-    await plug.update()
-    logger.info("Using plug via MAC discovery (%s)", plug.host)
     return plug
 
 
 async def find_plug_by_mac(mac: str, timeout=5) -> Optional[SmartPlug]:
+    credentials = Credentials(KASA_USERNAME, KASA_PASSWORD)
     mac = mac.lower()
     logger.info("Discovering smart plug by MAC: %s", mac)
-    devices = await Discover.discover(timeout=timeout)
+    devices = await Discover.discover(timeout=timeout, credentials=credentials)
     for dev in devices.values():
         if dev.mac and dev.mac.lower() == mac:
             logger.info(
@@ -83,7 +86,10 @@ async def find_plug_by_mac(mac: str, timeout=5) -> Optional[SmartPlug]:
                 dev.host,
                 dev.mac,
             )
-            return cast(SmartPlug, dev)
+            plug = cast(SmartPlug, dev)
+            await plug.update()
+            logger.info("Using plug via MAC discovery (%s)", plug.host)
+            return plug
     return None
 
 

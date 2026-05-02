@@ -4,6 +4,9 @@ PLUG_MAC = "AA:BB:CC:DD:EE:FF"
 PUSHOVER_USER_KEY = "your_user_key_here"
 PUSHOVER_APP_TOKEN = "your_app_token_here"
 
+KASA_USERNAME = "your_kasa_username_here"
+KASA_PASSWORD = "your_kasa_password_here"
+
 DO_CALIBRATION_CYCLES = True
 CALIBRATION_CYCLES = 1
 CALIBRATION_STATE_FILE = "calibration_done.flag"

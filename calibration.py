@@ -84,8 +84,9 @@ async def run_calibration_cycles(plug: SmartPlug, cycles: int) -> None:
                 logger.critical("Discharge phase exceeded maximum duration")
                 await ensure_plug_on(plug)
                 return
-
-            await ensure_plug_off(plug)
+            
+            if plug.is_on:
+                await ensure_plug_off(plug)
             await asyncio.sleep(CALIBRATION_POLL_SECONDS)
 
     logger.warning("Calibration cycle start")

@@ -3,9 +3,10 @@ from pystray import MenuItem as item
 from PIL import Image, ImageDraw
 from control import Mode
 import asyncio
+import logging
 
 ICON_SIZE = 64
-
+logger = logging.getLogger(__name__)
 
 def create_icon(color):
     image = Image.new("RGB", (ICON_SIZE, ICON_SIZE), (30, 30, 30))
@@ -22,10 +23,29 @@ def format_remaining(seconds):
     return f" ({hours}h {minutes}m remaining)"
 
 
-def run_tray(shutdown_event, control):
+def run_tray(shutdown_event, control, loop):
+    """
+    shutdown_event: threading.Event (shared)
+    control: ControlState instance (async methods)
+    loop: the asyncio event loop running in the background thread
+    """
+
+    def run_async(coro, timeout=2):
+        """
+        Submit coroutine to the running loop and return result (or raise).
+        Using a small timeout protects the UI thread from hanging forever.
+        """
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result(timeout)
 
     def update_visuals(icon):
-        mode, remaining = asyncio.run(control.get_mode())
+        try:
+            mode, remaining = run_async(control.get_mode())
+        except Exception as e:
+            logger.exception("Failed to fetch mode for tray visuals: %s", e)
+            # keep previous visuals if update fails
+            return
+
         color, text = "", ""
         if mode == Mode.NORMAL:
             color = "green"
@@ -44,8 +64,20 @@ def run_tray(shutdown_event, control):
         icon.title = "Battery Controller\n" + text + format_remaining(remaining)
 
     def set_mode(mode, duration=None):
-        asyncio.run(control.set_mode(mode, duration))
-        update_visuals(icon)
+        try:
+            run_async(control.set_mode(mode, duration))
+            update_visuals(icon)
+        except Exception as e:
+            logger.exception("Failed to set mode from tray: %s", e)
+
+    # safe wrappers so exceptions don't escape to pystray
+    def safe_call(fn):
+        def wrapper(icon, item):
+            try:
+                fn(icon, item)
+            except Exception:
+                logger.exception("Tray callback failed")
+        return wrapper
 
     def force_on(icon, item):
         set_mode(Mode.FORCE_ON)
@@ -66,25 +98,38 @@ def run_tray(shutdown_event, control):
         set_mode(Mode.NORMAL)
 
     def quit_app(icon, item):
-        shutdown_event.set()
-        icon.stop()
+        try:
+            shutdown_event.set()  # threading.Event
+        except Exception:
+            logger.exception("Failed to set shutdown event from tray")
+        finally:
+            # stop tray UI
+            try:
+                icon.stop()
+            except Exception:
+                logger.exception("Failed to stop tray icon")
 
     icon = pystray.Icon(
         "BatteryController",
         create_icon("green"),
         "Battery Controller",
         menu=pystray.Menu(
-            item("Force ON", force_on),
-            item("Force ON (2 hours)", force_on_2h),
-            item("Force OFF", force_off),
+            item("Force ON", safe_call(force_on)),
+            item("Force ON (2 hours)", safe_call(force_on_2h)),
+            item("Force OFF", safe_call(force_off)),
             pystray.Menu.SEPARATOR,
-            item("Pause Automation", pause),
-            item("Pause (2 hours)", pause_2h),
-            item("Resume Normal Mode", resume),
+            item("Pause Automation", safe_call(pause)),
+            item("Pause (2 hours)", safe_call(pause_2h)),
+            item("Resume Normal Mode", safe_call(resume)),
             pystray.Menu.SEPARATOR,
-            item("Quit", quit_app),
+            item("Quit", safe_call(quit_app)),
         ),
     )
 
-    update_visuals(icon)
+    # initial update (defensive)
+    try:
+        update_visuals(icon)
+    except Exception:
+        logger.exception("Initial tray update failed")
+
     icon.run()

@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from time import time
 import logging
 from typing import Optional
@@ -21,10 +22,10 @@ async def enforce_normal_policy(plug: SmartPlug, percent: Optional[float]) -> No
         logger.info(f"Percent is {percent}")
         await ensure_plug_off(plug)
 
-async def normal_operation(plug: SmartPlug, shutdown_event: asyncio.Event, control: ControlState) -> None:
+async def normal_operation(plug: SmartPlug, shutdown_event: threading.Event, control: ControlState) -> None:
     logger.info("Starting normal operation")
     last_percent, last_power_state = get_battery_status()
-    await enforce_normal_policy(plug, last_percent)
+    
     vigilant = False
     vigilance_started_at = None
     if last_percent is not None:
@@ -34,20 +35,20 @@ async def normal_operation(plug: SmartPlug, shutdown_event: asyncio.Event, contr
             last_power_state,
         )
     while not shutdown_event.is_set():
-        from control import Mode
-
         await asyncio.sleep(NORMAL_POLL_FREQUENCY)
-        mode = await control.get_mode()
+        mode, _ = await control.get_mode()
 
         if mode == Mode.PAUSED:
             continue
 
         if mode == Mode.FORCE_ON:
-            await ensure_plug_on(plug)
+            if not plug.is_on:
+                await ensure_plug_on(plug)
             continue
 
         if mode == Mode.FORCE_OFF:
-            await ensure_plug_off(plug)
+            if plug.is_on:
+                await ensure_plug_off(plug)
             continue
 
         percent, power_plugged = get_battery_status()
@@ -61,6 +62,7 @@ async def normal_operation(plug: SmartPlug, shutdown_event: asyncio.Event, contr
             logger.error("Plug update failed: %s", e)
             continue
         plug_is_on = plug.is_on
+        
         # Enter vigilance
         if VIGILANCE_MIN_PERCENT < percent < VIGILANCE_MAX_PERCENT and not vigilant:
             vigilant = True
