@@ -73,7 +73,7 @@ async def run_calibration_cycles(plug: SmartPlug, cycles: int) -> None:
                     percent,
                 )
                 await ensure_plug_on(plug)
-                return  # Let Windows hibernate if it chooses
+                return  # Let the OS hibernate if it chooses
 
             if percent <= CALIBRATION_DISCHARGE_TO:
                 logger.info("Reached %d%% — discharge complete", percent)

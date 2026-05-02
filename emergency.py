@@ -1,5 +1,6 @@
 import logging
 import subprocess
+import sys
 import requests
 from config import PUSHOVER_APP_TOKEN, PUSHOVER_USER_KEY
 
@@ -22,7 +23,10 @@ def notify_emergency(title: str, message: str) -> None:
 
 def hibernate_system() -> None:
     logger.critical("Battery emergency detected — hibernating system immediately")
-    subprocess.run(
-        ["shutdown", "/h", "/f"],
-        check=False
-    )
+    if sys.platform.startswith("win"):
+        cmd = ["shutdown", "/h", "/f"]
+    elif sys.platform == "darwin":
+        cmd = ["pmset", "sleepnow"]
+    else:
+        cmd = ["systemctl", "hibernate"]
+    subprocess.run(cmd, check=False)
