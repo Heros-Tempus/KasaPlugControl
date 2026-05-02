@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import threading
-import sys
 from time import sleep
 
 from control import ControlState
@@ -64,11 +63,9 @@ if __name__ == "__main__":
     while "loop" not in loop_holder:
         sleep(0.01)
 
-    # Run tray in main thread (Windows safe)
-    if sys.platform.startswith("win"):
-        from windows_tray import run_tray
-        # pass the actual loop object so tray can submit coroutines safely
+    try:
+        from tray import run_tray
         run_tray(shutdown_event, control, loop_holder["loop"])
-    else:
-        # Non-Windows fallback: just block until shutdown
+    except Exception as e:
+        logger.warning("System tray unavailable (%s), running headless", e)
         async_thread.join()
