@@ -23,18 +23,23 @@ def format_remaining(seconds):
     return f" ({hours}h {minutes}m remaining)"
 
 
-def run_tray(shutdown_event, control, loop):
+def run_tray(shutdown_event, control, loop_holder):
     """
     shutdown_event: threading.Event (shared)
     control: ControlState instance (async methods)
-    loop: the asyncio event loop running in the background thread
+    loop_holder: dict with key "loop" pointing to the current asyncio event loop;
+                 updated in place when the loop restarts after a crash
     """
 
-    def run_async(coro, timeout=2):
+    def run_async(coro, timeout=10):
         """
-        Submit coroutine to the running loop and return result (or raise).
-        Using a small timeout protects the UI thread from hanging forever.
+        Submit coroutine to the current loop and return result (or raise).
+        Reads loop_holder["loop"] on every call so it picks up restarted loops.
         """
+        loop = loop_holder.get("loop")
+        if loop is None or loop.is_closed():
+            coro.close()
+            raise RuntimeError("Async loop is not running")
         future = asyncio.run_coroutine_threadsafe(coro, loop)
         return future.result(timeout)
 

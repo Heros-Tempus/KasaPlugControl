@@ -9,30 +9,36 @@ from typing import Optional, cast
 
 logger = logging.getLogger(__name__)
 
+_CHARGE_VERIFY_TIMEOUT = 15
+
 async def ensure_plug_on(plug: SmartPlug) -> None:
     for attempt in range(3):
         await plug.update()
         if not plug.is_on:
             logger.info("Turning smart plug ON (attempt %d)", attempt + 1)
             await plug.turn_on()
-            charging_ok = await verify_charging_after_plug_on(timeout=5)
-            await plug.update()
-            if not charging_ok and plug.is_on:
-
-                if attempt == 0:
-                    logger.warning("Plug ON but laptop did NOT start charging within %ds", 5)
-                if attempt == 1:
-                    logger.warning("Plug ON but laptop did NOT start charging within %ds (attempt 2)", 5)
-                if attempt == 2:
-                    logger.critical("Plug ON but laptop did NOT start charging within %ds (attempt 3)", 5)
-                    notify_emergency(
-                        "Charging Failure",
-                        "Smart plug turned ON but laptop did not start charging within 5 seconds. "
-                        "Check cable, adapter, or outlet immediately.",
-                    )
-            elif charging_ok and plug.is_on:
-                logger.info("Plug is ON and laptop is charging")
-                break
+        charging_ok = await verify_charging_after_plug_on(timeout=_CHARGE_VERIFY_TIMEOUT)
+        await plug.update()
+        if charging_ok and plug.is_on:
+            logger.info("Plug is ON and laptop is charging")
+            return
+        if attempt < 2:
+            logger.warning(
+                "Plug ON but laptop did NOT start charging within %ds (attempt %d), power-cycling",
+                _CHARGE_VERIFY_TIMEOUT, attempt + 1,
+            )
+            await plug.turn_off()
+            await asyncio.sleep(2)
+        else:
+            logger.critical(
+                "Plug ON but laptop did NOT start charging within %ds (attempt 3)",
+                _CHARGE_VERIFY_TIMEOUT,
+            )
+            notify_emergency(
+                "Charging Failure",
+                f"Smart plug turned ON but laptop did not start charging within {_CHARGE_VERIFY_TIMEOUT} seconds. "
+                "Check cable, adapter, or outlet immediately.",
+            )
 
 async def verify_charging_after_plug_on(timeout=5) -> bool:
     start = time()
