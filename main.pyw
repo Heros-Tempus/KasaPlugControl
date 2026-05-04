@@ -1,7 +1,8 @@
 import asyncio
 import logging
+import sys
 import threading
-from time import sleep
+from time import sleep, time
 
 from control import ControlState
 from normal_operation import normal_operation
@@ -12,6 +13,25 @@ from logger import setup_logging
 
 logger = logging.getLogger(__name__)
 control = ControlState()
+
+
+def _wait_for_shell(timeout: int = 60) -> bool:
+    """Block until the Windows taskbar shell window exists, or timeout elapses.
+
+    The system tray lives inside Shell_TrayWnd. At login, Explorer can take
+    several seconds to create it, so pystray will fail silently if we don't
+    wait. Non-Windows platforms always return True immediately.
+    """
+    if not sys.platform.startswith("win"):
+        return True
+    import ctypes
+    user32 = ctypes.windll.user32
+    deadline = time() + timeout
+    while time() < deadline:
+        if user32.FindWindowW("Shell_TrayWnd", None):
+            return True
+        sleep(2)
+    return False
 
 async def async_main(shutdown_event: threading.Event):
     setup_logging()
@@ -73,9 +93,21 @@ if __name__ == "__main__":
     while "loop" not in loop_holder:
         sleep(0.01)
 
-    try:
-        from tray import run_tray
-        run_tray(shutdown_event, control, loop_holder)
-    except Exception as e:
-        logger.warning("System tray unavailable (%s), running headless", e)
+    if not _wait_for_shell(timeout=60):
+        logger.warning("Shell_TrayWnd not found after 60s — running headless")
         async_thread.join()
+    else:
+        from tray import run_tray
+        for attempt in range(1, 6):
+            try:
+                run_tray(shutdown_event, control, loop_holder)
+                break  # normal exit (user clicked Quit)
+            except Exception as e:
+                if attempt < 5:
+                    logger.warning(
+                        "Tray init failed (attempt %d/5): %s — retrying in 10s", attempt, e
+                    )
+                    sleep(10)
+                else:
+                    logger.warning("Tray unavailable after 5 attempts — running headless")
+                    async_thread.join()

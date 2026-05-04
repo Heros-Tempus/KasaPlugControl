@@ -29,4 +29,7 @@ def hibernate_system() -> None:
         cmd = ["pmset", "sleepnow"]
     else:
         cmd = ["systemctl", "hibernate"]
-    subprocess.run(cmd, check=False)
+    if sys.platform.startswith("win"):
+        subprocess.run(cmd, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+    else:
+        subprocess.run(cmd, check=False)
