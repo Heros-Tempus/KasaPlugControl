@@ -116,6 +116,11 @@ async def find_plug_by_mac(mac: str, timeout: int = 5) -> Optional[SmartPlug]:
 
 
 async def ensure_plug_on(plug: SmartPlug) -> None:
+    """ Turns the plug on and confirms the laptop begins drawing power within the
+    timeout. If charging is not detected, the plug is power-cycled (off then
+    on again) - a stuck relay or momentary firmware glitch can leave the plug
+    reporting ON while the outlet still delivers no power.
+    """
     for attempt in range(3):
         await plug.update()
         if not plug.is_on:

@@ -61,6 +61,11 @@ async def async_main(shutdown_event: threading.Event):
 
 
 def start_async_loop(shutdown_event: threading.Event, loop_holder: dict):
+    """A fresh event loop is created on each iteration so a crashed loop does
+    not poison the next run. loop_holder is a mutable dict rather than a
+    plain variable so the tray thread can always read the current loop
+    reference even after a crash-and-restart has replaced it.
+    """
     while not shutdown_event.is_set():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

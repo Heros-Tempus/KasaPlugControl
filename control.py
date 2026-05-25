@@ -21,6 +21,8 @@ class ControlState:
             self.mode = mode
             if duration_seconds:
                 loop = asyncio.get_running_loop()
+                # loop.time() is a monotonic clock, so timed overrides are
+                # unaffected by wall-clock adjustments or DST changes.
                 self.until = loop.time() + duration_seconds
             else:
                 self.until = None

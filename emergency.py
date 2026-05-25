@@ -6,6 +6,10 @@ from config import PUSHOVER_APP_TOKEN, PUSHOVER_USER_KEY
 
 logger = logging.getLogger(__name__)
 def notify_emergency(title: str, message: str) -> None:
+    """Sends a high-priority push notification via the Pushover service using
+    the app token and user key from config. Failures are logged but not
+    re-raised so a notification outage never interrupts the emergency flow.
+    """
     try:
         requests.post(
             "https://api.pushover.net/1/messages.json",

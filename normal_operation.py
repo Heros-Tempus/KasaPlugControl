@@ -6,7 +6,6 @@ from typing import Optional
 from kasa import SmartPlug
 from config import CHARGE_FAILURE_DELTA, NORMAL_CHARGE_OFF_ABOVE, NORMAL_CHARGE_ON_BELOW, NORMAL_POLL_FREQUENCY, VIGILANCE_GRACE_SECONDS, VIGILANCE_MAX_PERCENT, VIGILANCE_MIN_PERCENT
 from control import ControlState, Mode
-import control
 from emergency import hibernate_system, notify_emergency
 from plug_functions import ensure_plug_off, ensure_plug_on, get_battery_status
 
@@ -23,6 +22,11 @@ async def enforce_normal_policy(plug: SmartPlug, percent: Optional[float]) -> No
         await ensure_plug_off(plug)
 
 async def normal_operation(plug: SmartPlug, shutdown_event: threading.Event, control: ControlState) -> None:
+    """Vigilance mode engages when the battery enters a critically low range to
+    distinguish a normal low-battery situation from a charging failure. If the
+    battery continues dropping despite the plug being on, after a short grace
+    period the system hibernates to protect whatever charge remains.
+    """
     logger.info("Starting normal operation")
     last_percent, last_power_state = get_battery_status()
     
@@ -121,7 +125,7 @@ async def normal_operation(plug: SmartPlug, shutdown_event: threading.Event, con
             await ensure_plug_on(plug)
         await enforce_normal_policy(plug, percent)
 
-    # ---- Charging expectation failure detection ----
+        # ---- Charging expectation failure detection ----
         expected_min = NORMAL_CHARGE_ON_BELOW - CHARGE_FAILURE_DELTA
 
         if (percent <= expected_min and plug_is_on and not power_plugged):

@@ -3,7 +3,7 @@ import logging
 from time import ctime
 import asyncio
 from kasa import SmartPlug
-from config import CALIBRATION_HARD_FLOOR, CALIBRATION_HOLD_FOR, CALIBRATION_MAX_CHARGE_SECONDS, CALIBRATION_MAX_DISCHARGE_SECONDS, CALIBRATION_PUSH_ON_COMPLETE, CALIBRATION_STALL_WINDOW, CALIBRATION_STATE_FILE, CALIBRATION_CHARGE_TO, CALIBRATION_POLL_SECONDS, CALIBRATION_DISCHARGE_TO
+from config import CALIBRATION_HARD_FLOOR, CALIBRATION_HOLD_FOR, CALIBRATION_MAX_CHARGE_SECONDS, CALIBRATION_MAX_DISCHARGE_SECONDS, CALIBRATION_PUSH_ON_COMPLETE, CALIBRATION_STATE_FILE, CALIBRATION_CHARGE_TO, CALIBRATION_POLL_SECONDS, CALIBRATION_DISCHARGE_TO
 from emergency import notify_emergency
 from plug_functions import ensure_plug_off, ensure_plug_on, get_battery_status
 
@@ -16,6 +16,12 @@ def mark_calibration_done() -> None:
         f.write(ctime())
 
 async def run_calibration_cycles(plug: SmartPlug, cycles: int) -> None:
+    """Charges to the target level first to establish a known baseline, then
+    runs the requested number of full discharge->charge cycles to exercise
+    the battery across its full capacity range. Each phase is independently
+    time-bounded and discharge has a hard safety floor that forces charging
+    if the battery drops to a critically low level mid-cycle.
+    """
     logger.warning("Starting battery calibration: %d cycle(s)", cycles)
 
     loop = asyncio.get_running_loop()
