@@ -1,21 +1,24 @@
+import threading
+from typing import Coroutine, Any
+
 import pystray
 from pystray import MenuItem as item
 from PIL import Image, ImageDraw
-from control import Mode
+from control import ControlState, Mode
 import asyncio
 import logging
 
 ICON_SIZE = 64
 logger = logging.getLogger(__name__)
 
-def create_icon(color):
+def create_icon(color: str):
     image = Image.new("RGB", (ICON_SIZE, ICON_SIZE), (30, 30, 30))
     draw = ImageDraw.Draw(image)
     draw.ellipse((16, 16, 48, 48), fill=color)
     return image
 
 
-def format_remaining(seconds):
+def format_remaining(seconds: int):
     if seconds is None:
         return ""
     hours = seconds // 3600
@@ -23,7 +26,7 @@ def format_remaining(seconds):
     return f" ({hours}h {minutes}m remaining)"
 
 
-def run_tray(shutdown_event, control, loop_holder):
+def run_tray(shutdown_event: threading.Event, control: ControlState, loop_holder: dict):
     """
     shutdown_event: threading.Event (shared)
     control: ControlState instance (async methods)
@@ -31,7 +34,7 @@ def run_tray(shutdown_event, control, loop_holder):
                  updated in place when the loop restarts after a crash
     """
 
-    def run_async(coro, timeout=10):
+    def run_async(coro: Coroutine[Any, Any, Any], timeout: float = 10):
         """
         Submit coroutine to the current loop and return result (or raise).
         Reads loop_holder["loop"] on every call so it picks up restarted loops.
@@ -68,9 +71,12 @@ def run_tray(shutdown_event, control, loop_holder):
         icon.icon = create_icon(color)
         icon.title = "Battery Controller\n" + text + format_remaining(remaining)
 
-    def set_mode(mode, duration=None):
+    def set_mode(mode: Mode, duration: int | None = None):
         try:
             run_async(control.set_mode(mode, duration))
+            loop = loop_holder.get("loop")
+            if duration is not None and loop is not None:
+                loop.call_later(duration, lambda: threading.Thread(target=update_visuals, args=(icon,), daemon=True).start())
             update_visuals(icon)
         except Exception as e:
             logger.exception("Failed to set mode from tray: %s", e)
