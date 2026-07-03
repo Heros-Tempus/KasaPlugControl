@@ -76,7 +76,13 @@ def run_tray(shutdown_event: threading.Event, control: ControlState, loop_holder
             run_async(control.set_mode(mode, duration))
             loop = loop_holder.get("loop")
             if duration is not None and loop is not None:
-                loop.call_later(duration, lambda: threading.Thread(target=update_visuals, args=(icon,), daemon=True).start())
+                # Wrap call_later inside call_soon_threadsafe so it executes on the loop's own thread
+                loop.call_soon_threadsafe(
+                    lambda: loop.call_later(
+                        duration, 
+                        lambda: threading.Thread(target=update_visuals, args=(icon,), daemon=True).start()
+                    )
+                )
             update_visuals(icon)
         except Exception as e:
             logger.exception("Failed to set mode from tray: %s", e)
@@ -142,5 +148,17 @@ def run_tray(shutdown_event: threading.Event, control: ControlState, loop_holder
         update_visuals(icon)
     except Exception:
         logger.exception("Initial tray update failed")
+
+    def refresh():
+        threading.Thread(target=update_visuals, args=(icon,), daemon=True).start()
+        if not shutdown_event.is_set():
+            current_loop = loop_holder.get("loop")
+            if current_loop is not None and not current_loop.is_closed():
+                current_loop.call_later(60, refresh)
+
+    startup_loop = loop_holder.get("loop")
+    if startup_loop is not None and not startup_loop.is_closed():
+        startup_loop.call_soon_threadsafe(startup_loop.call_later, 60, refresh)
+
 
     icon.run()

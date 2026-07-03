@@ -1,5 +1,7 @@
 import asyncio
+import ipaddress
 import logging
+import socket
 import subprocess
 import sys
 from time import time
@@ -61,6 +63,51 @@ def _find_ip_by_mac_arp(mac: str) -> Optional[str]:
     return None
 
 
+def _get_local_subnets() -> list[tuple[str, str]]:
+    """Return (address, netmask) pairs for all active non-loopback IPv4 interfaces."""
+    subnets = []
+    CGNAT = ipaddress.ip_network("100.64.0.0/10")
+    for addrs in psutil.net_if_addrs().values():
+        for addr in addrs:
+            if ipaddress.ip_address(addr.address) in CGNAT:
+                continue  # skip Tailscale and any other CGNAT interface
+            if addr.family == socket.AF_INET and not addr.address.startswith("127."):
+                subnets.append((addr.address, addr.netmask))
+    return subnets
+
+
+async def _ping_one(ip: str) -> None:
+    if sys.platform.startswith("win"):
+        proc = await asyncio.create_subprocess_exec(
+            "ping", "-n", "1", "-w", "200", ip,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    else:
+        proc = await asyncio.create_subprocess_exec(
+            "ping", "-c", "1", "-W", "1", ip,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+    await proc.wait()
+
+
+async def _ping_sweep_subnets() -> None:
+    """Ping every host on all local subnets to warm the OS ARP cache."""
+    subnets = _get_local_subnets()
+    if not subnets:
+        logger.warning("No local subnets found for ping sweep")
+        return
+    tasks = []
+    for address, netmask in subnets:
+        network = ipaddress.IPv4Network(f"{address}/{netmask}", strict=False)
+        tasks.extend(_ping_one(str(ip)) for ip in network.hosts())
+    logger.info("Ping sweep: sending %d pings across %d subnet(s)", len(tasks), len(subnets))
+    await asyncio.gather(*tasks)
+    logger.info("Ping sweep complete")
+
+
 async def get_plug() -> SmartPlug:
     credentials = Credentials(KASA_USERNAME, KASA_PASSWORD)
 
@@ -70,8 +117,7 @@ async def get_plug() -> SmartPlug:
         return plug
     logger.warning("MAC-based UDP discovery failed — trying ARP table")
 
-    # 2. ARP table lookup — OS caches IP→MAC from background network traffic,
-    #    giving us the current IP without needing UDP to reach the plug directly
+    # 2. ARP table lookup (cold cache)
     arp_ip = _find_ip_by_mac_arp(PLUG_MAC)
     if arp_ip:
         try:
@@ -82,11 +128,27 @@ async def get_plug() -> SmartPlug:
                 logger.info("Found plug via ARP table at %s", arp_ip)
                 return plug
         except Exception as e:
-            logger.warning("ARP-found IP %s unreachable: %s — trying config IP", arp_ip, e)
+            logger.warning("ARP-found IP %s unreachable: %s — sweeping subnet", arp_ip, e)
     else:
-        logger.warning("MAC not in ARP table — trying config IP")
+        logger.warning("MAC not in ARP table — sweeping subnet")
 
-    # 3. Cached config IP — last resort; may be stale if DHCP assigned a new address
+    # 3. Ping sweep to warm the ARP cache, then try ARP lookup again
+    await _ping_sweep_subnets()
+    arp_ip = _find_ip_by_mac_arp(PLUG_MAC)
+    if arp_ip:
+        try:
+            device = await Discover.discover_single(arp_ip, credentials=credentials)
+            if device:
+                plug = cast(SmartPlug, device)
+                await plug.update()
+                logger.info("Found plug via ping sweep + ARP at %s", arp_ip)
+                return plug
+        except Exception as e:
+            logger.warning("Ping-sweep ARP IP %s unreachable: %s — trying config IP", arp_ip, e)
+    else:
+        logger.warning("MAC not in ARP table after ping sweep — trying config IP")
+
+    # 4. Cached config IP — last resort; may be stale if DHCP assigned a new address
     try:
         device = await Discover.discover_single(PLUG_IP, credentials=credentials)
         if device:

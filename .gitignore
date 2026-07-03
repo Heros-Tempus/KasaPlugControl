@@ -3,6 +3,6 @@ config.py
 
 # runtime artifacts
 *.log
-*.log.1
+*.log.*
 *.flag
 __pycache__/
