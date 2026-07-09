@@ -28,15 +28,16 @@ async def normal_operation(plug: SmartPlug, shutdown_event: threading.Event, con
     period the system hibernates to protect whatever charge remains.
     """
     logger.info("Starting normal operation")
-    last_percent, last_power_state = get_battery_status()
+    init_percent, init_power_state = get_battery_status()
+    last_percent, last_power_state = None, None
     
     vigilant = False
     vigilance_started_at = None
-    if last_percent is not None:
+    if init_percent is not None:
         logger.info(
             "Initial state: %d%%, power_plugged=%s",
-            last_percent,
-            last_power_state,
+            init_percent,
+            init_power_state,
         )
     while not shutdown_event.is_set():
         await asyncio.sleep(NORMAL_POLL_FREQUENCY)
