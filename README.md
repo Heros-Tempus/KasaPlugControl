@@ -2,91 +2,114 @@
 
 A cross-platform utility to control a Kasa smart plug for safe laptop battery charging.
 
-Features
+## Features
 
-- Normal operation mode: battery monitoring via periodic polling.
-- Vigilance mode when battery is in a risky window; can trigger hibernation on emergency.
-- Optional multi-cycle calibration routine to exercise full charge/discharge cycles.
-- Pushover notifications for critical alerts.
-- System tray icon for at-a-glance status and manual mode control (Windows, macOS, and Linux desktop environments).
+* **Normal operation mode:** Battery monitoring via periodic polling.
+* **Vigilance mode:** Engages when the battery is in a risky window; can trigger system hibernation on emergency to protect remaining charge.
+* **Calibration routine:** Optional multi-cycle calibration routine to exercise full charge/discharge cycles.
+* **Emergency alerts:** Pushover notifications for critical charging failures.
+* **System tray icon:** For at-a-glance status and manual mode control (Windows, macOS, and Linux desktop environments).
 
-Prerequisites
+---
 
-- Python 3.8+
-- Kasa-compatible smart plug reachable on the LAN (IP or MAC)
+## Prerequisites
 
-Python dependencies
+* Python 3.8+
+* A Kasa-compatible smart plug reachable on your local network (IP or MAC address).
 
-Run:
+---
+
+## Installation
+
+**1. Clone or download the repository:**
+Navigate to the project folder in your terminal.
+
+**2. Create a virtual environment:**
+Isolating dependencies ensures this app doesn't interfere with other Python projects on your system.
+
+* **Windows:**
+
+    ```powershell
+    python -m venv venv
+    ```
+
+* **macOS / Linux:**
+
+    ```bash
+    python3 -m venv venv
+    ```
+
+**3. Activate the virtual environment:**
+
+* **Windows:**
+
+    ```powershell
+    venv\Scripts\activate
+    ```
+
+* **macOS / Linux:**
+
+    ```bash
+    source venv/bin/activate
+    ```
+
+**4. Install Python dependencies:**
+With the virtual environment activated, install the required packages:
 
 ```bash
-pip install kasa psutil requests pystray Pillow
+pip install -r requirements.txt
 ```
 
-Linux system tray dependencies (desktop only, not required on headless systems):
+*(Note: Linux desktop users will also need system dependencies for the tray icon: ```sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1```. GNOME users will need the AppIndicator and KStatusNotifierItem Support extension. On headless systems, the tray is skipped automatically and the program runs without it.)*
 
-```bash
-sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1
-```
+---
 
-Note: GNOME users will also need the [AppIndicator and KStatusNotifierItem Support](https://extensions.gnome.org/extension/615/appindicator-support/) extension. On headless systems the tray is skipped automatically and the program runs without it.
+## Configuration
 
-Configuration
+Before running the application, you must create a local configuration file.
 
-Copy the example config and edit the values.
+1. Locate the ```config.example.py``` file in the project directory.
+2. Make a copy of it and name the new file ```config.py```.
+    * **Windows:** ```copy config.example.py config.py```
+    * **macOS / Linux:** ```cp config.example.py config.py```
+3. Open ```config.py``` in a text editor and fill in your specific details (e.g., ```PLUG_IP```, ```PLUG_MAC```, ```KASA_USERNAME```, ```KASA_PASSWORD```, and ```PUSHOVER``` tokens).
 
-Windows:
+**Privacy Note:** The ```config.py``` file is strictly required for the app to function, but it is explicitly ignored by version control (via ```.gitignore```) to ensure your sensitive network data, passwords, and API tokens are never accidentally uploaded to a public repository. Never commit your ```config.py``` file!
 
-```powershell
-copy config.example.py config.py
-```
+---
 
-Linux / macOS:
+## Quick Usage
 
-```bash
-cp config.example.py config.py
-```
+Once installed and configured, you do not need to manually activate the virtual environment every time. You can use the provided launch scripts to start the background process and system tray icon:
 
-Then edit `config.py` to set `PLUG_IP`, `PLUG_MAC`, `KASA_USERNAME`, `KASA_PASSWORD`, `PUSHOVER_*`, and thresholds.
+* **Windows:** Double-click ```start.bat```
+* **macOS / Linux:** Run ```./start.sh``` (you may need to run ```chmod +x start.sh``` first to make it executable).
 
-See [config.example.py](config.example.py) for all settings and sensible defaults.
-
-Quick usage
-
-Run the controller:
+Alternatively, if you are running it manually from an active virtual environment terminal:
 
 ```bash
 python main.pyw
 ```
 
-Notes
+---
 
-- Calibration cycles (long-running) are enabled via `DO_CALIBRATION_CYCLES` and controlled by `CALIBRATION_CYCLES` in `config.py`.
-- Logs are written to the file defined by `LOG_FILE` (default: `battery_charge_controller.log`).
-- Emergency notifications use Pushover — provide `PUSHOVER_USER_KEY` and `PUSHOVER_APP_TOKEN` in `config.py`.
+## Behavior Summary
 
-Behavior summary
+* **Charging Bounds:** When the battery falls below ```NORMAL_CHARGE_ON_BELOW```, the plug is turned ON. When it rises above ```NORMAL_CHARGE_OFF_ABOVE```, the plug is turned OFF.
+* **Vigilance Mode:** If the battery drops into a critically low threshold (```VIGILANCE_MIN_PERCENT``` to ```VIGILANCE_MAX_PERCENT```), the app monitors it closely. If the battery continues to drop despite the plug being on, the system will hibernate after a short grace period.
+* **Charge Verification:** If the plug is commanded ON but the laptop does not register as charging within a set timeout, the app will power-cycle the plug. After 3 failed attempts, it sends an emergency notification.
+* **Calibration:** If ```DO_CALIBRATION_CYCLES``` is enabled, on startup the app will override normal operation to perform full deep-discharge and 100% charge cycles to exercise the battery.
 
-- When the battery percent falls below `NORMAL_CHARGE_ON_BELOW` the plug will be turned ON.
-- When the battery percent rises above `NORMAL_CHARGE_OFF_ABOVE` the plug will be turned OFF.
-- If the battery drops suddenly while in a vigilance window and not charging, the system will hibernate.
-- If the plug is turned ON but charging does not start, the system retries and can send an emergency notification.
+---
 
-Development and testing
+## Security & Safety
 
-- For quick testing, set `DO_CALIBRATION_CYCLES = False` to avoid long calibration waits.
-- Be sure to set the smart plug's `PLUG_MAC` or `PLUG_IP` properly.
+* **Failsafe Hibernation:** Battery emergencies trigger an immediate system hibernate. The command used is platform-dependent: ```shutdown /h /f``` on Windows, ```systemctl hibernate``` on Linux, and ```pmset sleepnow``` on macOS.
+* **Notifications:** Pushover tokens are optional but highly recommended. If they are omitted, notification failures are simply logged locally.
+* **Logging:** Events and errors are written locally to the file defined by ```LOG_FILE``` (default: ```battery_charge_controller.log```).
 
-Security & safety
+---
 
-- Battery emergencies trigger an immediate system hibernate. The command used is platform-dependent: `shutdown /h /f` on Windows, `systemctl hibernate` on Linux, and `pmset sleepnow` on macOS.
-- Pushover tokens optional, though recommended. If they are ommited then the notification failure will be logged.
-- Keep Pushover tokens and Kasa credentials private and out of version control (the default `.gitignore` excludes `config.py`).
+### License
 
-License
-
-- MIT-style (add or adapt as you prefer).
-
-Questions or changes
-
-- Open an issue or modify the README for improvements.
+MIT License

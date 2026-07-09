@@ -1,0 +1,5 @@
+python-kasa
+psutil
+requests
+pystray
+Pillow
